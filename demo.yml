@@ -1,0 +1,22 @@
+info:
+  name: demo
+  version: 1.0.0
+  path: /order-list
+  db: db2
+composition:
+  fields:
+    base:
+      - name: order_no
+        expr: order_number
+      - name: type
+        expr: type
+      - name: ip
+        expr: ip_address
+      - name: state
+        expr: state
+      - name: create_time
+        expr: placed
+  subject: >
+    SELECT %fields.base FROM commerce_order
+  total: >
+    SELECT COUNT(order_id) FROM commerce_order

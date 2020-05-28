@@ -6,6 +6,9 @@ import (
   "github.com/jmoiron/sqlx"
   "github.com/kelseyhightower/envconfig"
   log "github.com/sirupsen/logrus"
+  swaggerFiles "github.com/swaggo/files"
+  ginSwagger "github.com/swaggo/gin-swagger"
+  _ "gitlab.com/beehplus/sql-compose/docs"
   "gitlab.com/beehplus/sql-compose/restapi"
   "time"
 )
@@ -22,6 +25,20 @@ type Specification struct {
   ColorCodes map[string]int
 }
 
+// @title sql-compose-api
+// @version 1.0
+// @description This is a api for sql-compose.
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8080
+// @BasePath /
 func main() {
 
   var s Specification
@@ -38,12 +55,20 @@ func main() {
   }
   defer db.Close()
 
+  //b, _ := base64.StdEncoding.DecodeString("MjAyMDA1MjY3OQ==")
+  //fmt.Println(string(b))
+
   router := gin.Default()
+
+  url := ginSwagger.URL("http://localhost" +
+    s.Port + "/swagger/doc.json")
+  router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
 
   handler := restapi.NewHandler(db)
 
   router.GET("/doc", handler.GetDocList)
-  router.POST("/doc", handler.UpdateDoc)
+  router.POST("/doc/:uuid", handler.UpdateDoc)
+  router.PATCH("/doc", handler.AddDoc)
   router.GET("/doc/:uuid", handler.GetDocDetailByUuid)
 
   router.GET("/dbconfig", handler.GetDbConfigList)

@@ -17,6 +17,7 @@ import (
 type Handler interface {
   GetDocList(c *gin.Context)
   GetDocDetailByUuid(c *gin.Context)
+  AddDoc(c *gin.Context)
   UpdateDoc(c *gin.Context)
   GetResult(c *gin.Context)
 
@@ -36,6 +37,60 @@ func NewHandler(db *sqlx.DB) *Service {
   }
 }
 
+// @Summary 添加新的文档
+// @Tags 文档
+// @version 1.0
+// @Param content formData string true "文档内容"
+// @Success 201 {string} string	""insert completed""
+// @Failure 400 {object} Error "deserialize yaml failed"
+// @Router /doc [patch]
+func (s *Service) AddDoc(c *gin.Context) {
+  content := c.PostForm("content")
+  var doc repos.SqlApiDoc
+
+  buffer := []byte(content)
+  err := yaml.Unmarshal(buffer, &doc)
+  if err != nil {
+    log.Error(err)
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40002,
+      Message: "deserialize yaml failed",
+    })
+    return
+  }
+
+  params := map[string]interface{}{
+    "name":       doc.Info.Name,
+    "path":       doc.Info.Path,
+    "content":    content,
+    "created_at": time.Now().Unix(),
+    "updated_at": time.Now().Unix(),
+    "uuid":       uuid.NewV4().String(),
+  }
+
+  ////todo sqlx判断记录为空有更好的方法
+  //c.String(http.StatusBadRequest, "the document does not exist")
+
+  _, err = s.Db.NamedExec(`INSERT into doc (name,path,content,created_at,updated_at,uuid) VALUES (:name,:path,:content,:created_at,:updated_at,:uuid)`,
+    params,
+  )
+  if err != nil {
+    log.Warn(err)
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40001,
+      Message: "insert failed,maybe the name is duplicated",
+    })
+    return
+  }
+  c.String(http.StatusCreated, "insert completed")
+}
+
+// @Summary 获取文档列表
+// @Uuid xxx123
+// @Tags 文档
+// @version 1.0
+// @Success 200 {object} DocListResult
+// @Router /doc [get]
 func (s *Service) GetDocList(c *gin.Context) {
   var result DocListResult
   var data []*entity.Doc
@@ -54,6 +109,13 @@ func (s *Service) GetDocList(c *gin.Context) {
   c.JSON(http.StatusOK, result)
 
 }
+
+// @Summary 获取文档详情
+// @Tags 文档
+// @version 1.0
+// @Param uuid path string true "uuid"
+// @Success 200 {object} entity.Doc
+// @Router /doc/{uuid} [get]
 func (s *Service) GetDocDetailByUuid(c *gin.Context) {
 
   var doc entity.Doc
@@ -65,6 +127,15 @@ func (s *Service) GetDocDetailByUuid(c *gin.Context) {
   }
   c.JSON(http.StatusOK, doc)
 }
+
+// @Summary 更新文档
+// @Tags 文档
+// @version 1.0
+// @Param uuid path string true "uuid"
+// @Param content formData string true "content"
+// @Success 201 {string} string	"update completed"
+// @Failure 400 {object} Error "error"
+// @Router /doc/{uuid} [post]
 func (s *Service) UpdateDoc(c *gin.Context) {
   var docEntity entity.Doc
 
@@ -75,7 +146,10 @@ func (s *Service) UpdateDoc(c *gin.Context) {
   err := yaml.Unmarshal(buffer, &doc)
   if err != nil {
     log.Error(err)
-    c.String(http.StatusBadRequest, err.Error())
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40002,
+      Message: err.Error(),
+    })
     return
   }
 
@@ -85,72 +159,105 @@ func (s *Service) UpdateDoc(c *gin.Context) {
     "content":    content,
     "created_at": time.Now().Unix(),
     "updated_at": time.Now().Unix(),
-    "uuid":       uuid.NewV4().String(),
+    "uuid":       c.Param("uuid"),
   }
 
   tx := s.Db.MustBegin()
-  err = tx.Get(&docEntity, "SELECT uuid from doc where name=?", doc.Info.Name)
+  err = tx.Get(&docEntity, "SELECT uuid from doc where uuid=?", c.Param("uuid"))
 
   if err != nil {
-    ////todo sqlx判断记录为空有更好的方法
-    //c.String(http.StatusBadRequest, "the document does not exist")
-
-    _, err = tx.NamedExec(`INSERT into doc (name,path,content,created_at,updated_at,uuid) VALUES (:name,:path,:content,:created_at,:updated_at,:uuid)`,
-      params,
-    )
-    if err != nil {
-      log.Warn(err)
-      tx.Rollback()
-      c.String(http.StatusBadRequest, "insert failed")
-      return
-    }
-    c.String(http.StatusCreated, "insert completed")
-    tx.Commit()
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40003,
+      Message: "This document does not exist",
+    })
     return
   }
 
-  _, err = tx.NamedExec(`UPDATE doc SET path=:path,content=:content,created_at=:created_at,updated_at=:updated_at WHERE name=:name`,
+  _, err = tx.NamedExec(`UPDATE doc SET name=:name,path=:path,content=:content,created_at=:created_at,updated_at=:updated_at WHERE uuid=:uuid`,
     params, )
 
   if err != nil {
     log.Warn(err)
     tx.Rollback()
-    c.String(http.StatusBadRequest, "update failed")
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40004,
+      Message: "update failed",
+    })
     return
   }
   tx.Commit()
 
   c.String(http.StatusCreated, "update completed")
 }
+
+// @Summary 获取查询结果
+// @Tags 接口
+// @version 1.0
+// @Param path path string true "path"
+// @Success 200 {string} string	"json"
+// @Failure 400 {object} Error "error"
+// @Failure 404 {object} Error "not found"
+// @Router /{path} [get]
 func (s *Service) GetResult(c *gin.Context) {
   //get yml by path from db
   path := c.Param("path")
 
-  fmt.Println(path)
   var docEntity entity.Doc
   if err := s.Db.Get(&docEntity, "select * from doc WHERE path=?", path); err != nil {
     log.Error(err)
-    c.String(http.StatusNotFound, "this path does not exist")
+    c.JSON(http.StatusNotFound, Error{
+      Code:    40005,
+      Message: "this path does not exist",
+    })
     return
   }
+
+  //get filter params
+  var req GetResultRequest
+  if err := c.BindJSON(&req); err != nil {
+    log.Error(err)
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40006,
+      Message: "filter params error",
+    })
+    return
+  }
+
+  var reposFilters []repos.Filter
+  for _, filter := range req.Filters {
+    reposFilter := repos.Filter{
+      Val:  filter.Key,
+      Op:   repos.Contains,
+      Attr: filter.Val,
+    }
+    reposFilters = append(reposFilters, reposFilter)
+  }
+
+  fmt.Println(reposFilters)
+
+  where, err := repos.WhereAnd(&reposFilters)
   //get dsn by dbname
   var doc repos.SqlApiDoc
 
   buffer := []byte(docEntity.Content)
-  err := yaml.Unmarshal(buffer, &doc)
+  err = yaml.Unmarshal(buffer, &doc)
   if err != nil {
     log.Warn(err)
-    c.String(http.StatusBadRequest, "please check yaml")
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40007,
+      Message: err.Error(),
+    })
   }
 
   dbName := doc.Info.Db
 
-  fmt.Println(dbName)
-
   var dbConfig entity.DataBaseConfig
   err = s.Db.Get(&dbConfig, "SELECT * FROM database_config WHERE name=?", dbName)
   if err != nil {
-    c.String(http.StatusBadRequest, "please check dbname")
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40008,
+      Message: "please check dbname",
+    })
     return
   }
 
@@ -159,23 +266,66 @@ func (s *Service) GetResult(c *gin.Context) {
   db, err := sqlx.Connect("mysql", dsn)
   if err != nil {
     log.Error(err)
-    c.String(http.StatusBadRequest, "database connection error")
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40009,
+      Message: "database connection error",
+    })
     return
   }
   defer db.Close()
-  ////todo get sql by yml
-  //sqlBuilder, err := repos.NewSqlBuilder(db, []byte(docEntity.Content))
-  //if err != nil {
-  //  log.Error(err)
-  //  c.String(http.StatusBadRequest, err.Error())
-  //  return
-  //}
-  //query, _ := sqlBuilder.BuildQuery()
-  //res, _ := query.Queryx(nil)
 
-  c.JSON(http.StatusOK, nil)
+  sqlBuilder, err := repos.NewSqlBuilder(db, []byte(docEntity.Content))
+  if err != nil {
+    log.Error(err)
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40010,
+      Message: err.Error(),
+    })
+    return
+  }
+
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  stmt, _ := sqlBuilder.AndConditions(&where).Limit(0, 3).BuildQuery()
+
+  fmt.Println(stmt.QueryString)
+
+  //row := make(map[string]interface{})
+  //rows,err:= stmt.Queryx(where.Arg)
+  //if err!=nil {
+  //  log.Error(err)
+  //}
+  var result []interface{}
+  item := make(map[string]interface{})
+
+  rows, err := stmt.Queryx(where.Arg)
+  for rows.Next() {
+    err := rows.MapScan(item)
+    if err != nil {
+      log.Error(err)
+    }
+
+    for k, encoded := range item {
+      switch encoded.(type) {
+      case []byte:
+        item[k] = string(encoded.([]byte))
+      }
+    }
+    result = append(result, item)
+  }
+
+  c.JSON(http.StatusOK, result)
 }
 
+// @Summary 添加数据库配置
+// @Tags 数据库配置
+// @version 1.0
+// @Param params body AddDbConfigRequest true "DbConfig"
+// @Success 201 {string} string	"json"
+// @Failure 400 {object} Error "error"
+// @Router /dbconfig [patch]
 func (s *Service) AddDbConfig(c *gin.Context) {
   var req AddDbConfigRequest
   c.Bind(&req)
@@ -191,7 +341,10 @@ func (s *Service) AddDbConfig(c *gin.Context) {
     })
   if err != nil {
     log.Error(err)
-    c.String(http.StatusBadRequest, "added failed")
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40001,
+      Message: "added failed",
+    })
     tx.Rollback()
     return
   }
@@ -199,17 +352,36 @@ func (s *Service) AddDbConfig(c *gin.Context) {
 
   c.String(http.StatusCreated, "added successfully")
 }
+
+// @Summary 删除数据库配置
+// @Tags 数据库配置
+// @version 1.0
+// @Param uuid path string true "uuid"
+// @Success 201 {string} string	"json"
+// @Failure 400 {object} Error "error"
+// @Router /dbconfig/{uuid} [delete]
 func (s *Service) DeleteDbConfigByUUID(c *gin.Context) {
   uuid := c.Param("uuid")
   s.Db.MustExec("DELETE FROM database_config WHERE uuid=?", uuid)
 
   c.String(http.StatusCreated, "successfully deleted")
 }
+
+// @Summary 更新数据库配置
+// @Tags 数据库配置
+// @version 1.0
+// @Param params body AddDbConfigRequest true "DbConfig"
+// @Success 201 {string} string	"更新成功"
+// @Failure 400 {object} Error "error"
+// @Router /dbconfig/{uuid} [post]
 func (s *Service) UpdateDbConfigByUUID(c *gin.Context) {
   var req UpdateDbConfigRequest
   if err := c.Bind(&req); err != nil {
     log.Error(err)
-    c.String(http.StatusBadRequest, err.Error())
+    c.JSON(http.StatusBadRequest, Error{
+      Code:    40006,
+      Message: err.Error(),
+    })
     return
   }
   _, err := s.Db.NamedExec("UPDATE database_config SET name=:name,dsn=:dsn,updated_at=:updated_at WHERE uuid=:uuid",
@@ -225,6 +397,11 @@ func (s *Service) UpdateDbConfigByUUID(c *gin.Context) {
   c.String(http.StatusOK, "update completed")
 }
 
+// @Summary 数据库配置列表
+// @Tags 数据库配置
+// @version 1.0
+// @Success 200 {object} DbConfigList
+// @Router /dbconfig [get]
 func (s *Service) GetDbConfigList(c *gin.Context) {
   var list DbConfigList
   err := s.Db.Select(&list.Data, "SELECT * FROM database_config ORDER BY updated_at DESC ")

@@ -11,3 +11,12 @@ type DbConfigList struct {
   Data  []*entity.DataBaseConfig `json:"data"`
   Total int                      `json:"total"`
 }
+
+type Created struct {
+  Message string `json:"message"`
+}
+
+type Error struct {
+  Code    int    `json:"code"`
+  Message string `json:"message"`
+}

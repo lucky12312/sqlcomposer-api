@@ -1,0 +1,244 @@
+basePath: /
+definitions:
+  entity.DataBaseConfig:
+    properties:
+      created_at:
+        type: integer
+      deleted_at:
+        type: integer
+      dsn:
+        type: string
+      name:
+        type: string
+      updated_at:
+        type: integer
+      uuid:
+        type: string
+    type: object
+  entity.Doc:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: integer
+      deleted_at:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      updated_at:
+        type: integer
+      uuid:
+        type: string
+    type: object
+  restapi.AddDbConfigRequest:
+    properties:
+      dsn:
+        type: string
+      name:
+        type: string
+    type: object
+  restapi.DbConfigList:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/entity.DataBaseConfig'
+        type: array
+      total:
+        type: integer
+    type: object
+  restapi.DocListResult:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/entity.Doc'
+        type: array
+      total:
+        type: integer
+    type: object
+  restapi.Error:
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a api for sql-compose.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: sql-compose-api
+  version: "1.0"
+paths:
+  /{path}:
+    get:
+      parameters:
+      - description: path
+        in: path
+        name: path
+        required: true
+        type: string
+      responses:
+        "200":
+          description: json
+          schema:
+            type: string
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/restapi.Error'
+        "404":
+          description: not found
+          schema:
+            $ref: '#/definitions/restapi.Error'
+      summary: 获取查询结果
+      tags:
+      - 接口
+  /dbconfig:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/restapi.DbConfigList'
+      summary: 数据库配置列表
+      tags:
+      - 数据库配置
+    patch:
+      parameters:
+      - description: DbConfig
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/restapi.AddDbConfigRequest'
+      responses:
+        "201":
+          description: json
+          schema:
+            type: string
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/restapi.Error'
+      summary: 添加数据库配置
+      tags:
+      - 数据库配置
+  /dbconfig/{uuid}:
+    delete:
+      parameters:
+      - description: uuid
+        in: path
+        name: uuid
+        required: true
+        type: string
+      responses:
+        "201":
+          description: json
+          schema:
+            type: string
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/restapi.Error'
+      summary: 删除数据库配置
+      tags:
+      - 数据库配置
+    post:
+      parameters:
+      - description: DbConfig
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/restapi.AddDbConfigRequest'
+      responses:
+        "201":
+          description: 更新成功
+          schema:
+            type: string
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/restapi.Error'
+      summary: 更新数据库配置
+      tags:
+      - 数据库配置
+  /doc:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/restapi.DocListResult'
+      summary: 获取文档列表
+      tags:
+      - 文档
+    patch:
+      parameters:
+      - description: 文档内容
+        in: formData
+        name: content
+        required: true
+        type: string
+      responses:
+        "201":
+          description: insert completed
+          schema:
+            type: string
+        "400":
+          description: deserialize yaml failed
+          schema:
+            $ref: '#/definitions/restapi.Error'
+      summary: 添加新的文档
+      tags:
+      - 文档
+  /doc/{uuid}:
+    get:
+      parameters:
+      - description: uuid
+        in: path
+        name: uuid
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Doc'
+      summary: 获取文档详情
+      tags:
+      - 文档
+    post:
+      parameters:
+      - description: uuid
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: content
+        in: formData
+        name: content
+        required: true
+        type: string
+      responses:
+        "201":
+          description: update completed
+          schema:
+            type: string
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/restapi.Error'
+      summary: 更新文档
+      tags:
+      - 文档
+swagger: "2.0"
