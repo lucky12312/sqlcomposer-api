@@ -160,6 +160,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/restapi.AddDbConfigRequest'
+      - description: uuid
+        in: path
+        name: uuid
+        required: true
+        type: string
       responses:
         "201":
           description: 更新成功

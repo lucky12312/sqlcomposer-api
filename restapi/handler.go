@@ -371,6 +371,7 @@ func (s *Service) DeleteDbConfigByUUID(c *gin.Context) {
 // @Tags 数据库配置
 // @version 1.0
 // @Param params body AddDbConfigRequest true "DbConfig"
+// @Param uuid path string true "uuid"
 // @Success 201 {string} string	"更新成功"
 // @Failure 400 {object} Error "error"
 // @Router /dbconfig/{uuid} [post]
