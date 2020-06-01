@@ -75,7 +75,7 @@ func main() {
   router.DELETE("/dbconfig/:uuid/", handler.DeleteDbConfigByUUID)
   router.POST("/dbconfig/:uuid", handler.UpdateDbConfigByUUID)
   router.PATCH("/dbconfig", handler.AddDbConfig)
-  router.GET(s.BasePath+"*path", handler.GetResult)
+  router.POST(s.BasePath+"*path", handler.GetResult)
 
   if err := router.Run(s.Port); err != nil {
     log.Fatal(err)

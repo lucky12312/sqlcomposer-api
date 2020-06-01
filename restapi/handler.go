@@ -7,6 +7,7 @@ import (
   "github.com/jmoiron/sqlx"
   uuid "github.com/satori/go.uuid"
   log "github.com/sirupsen/logrus"
+  "github.com/wangxb07/sqlcomposer"
   "gitlab.com/beehplus/sql-compose/entity"
   "gitlab.com/beehplus/sql-compose/repos"
   "gopkg.in/yaml.v2"
@@ -46,6 +47,8 @@ func NewHandler(db *sqlx.DB) *Service {
 // @Router /doc [patch]
 func (s *Service) AddDoc(c *gin.Context) {
   content := c.PostForm("content")
+  fmt.Println(content)
+
   var doc repos.SqlApiDoc
 
   buffer := []byte(content)
@@ -223,9 +226,9 @@ func (s *Service) GetResult(c *gin.Context) {
     return
   }
 
-  var reposFilters []repos.Filter
+  var reposFilters []sqlcomposer.Filter
   for _, filter := range req.Filters {
-    reposFilter := repos.Filter{
+    reposFilter := sqlcomposer.Filter{
       Val:  filter.Key,
       Op:   repos.Contains,
       Attr: filter.Val,
@@ -235,7 +238,7 @@ func (s *Service) GetResult(c *gin.Context) {
 
   fmt.Println(reposFilters)
 
-  where, err := repos.WhereAnd(&reposFilters)
+  where, err := sqlcomposer.WhereAnd(&reposFilters)
   //get dsn by dbname
   var doc repos.SqlApiDoc
 
@@ -274,7 +277,9 @@ func (s *Service) GetResult(c *gin.Context) {
   }
   defer db.Close()
 
-  sqlBuilder, err := repos.NewSqlBuilder(db, []byte(docEntity.Content))
+
+
+  sqlBuilder, err := sqlcomposer.NewSqlBuilder(db,[]byte(docEntity.Content))
   if err != nil {
     log.Error(err)
     c.JSON(http.StatusBadRequest, Error{
@@ -288,35 +293,24 @@ func (s *Service) GetResult(c *gin.Context) {
     log.Fatal(err)
   }
 
-  stmt, _ := sqlBuilder.AndConditions(&where).Limit(0, 3).BuildQuery()
+  q, a, err:= sqlBuilder.AndConditions(&where).Limit(0,10).Rebind("test")
 
-  fmt.Println(stmt.QueryString)
+  fmt.Println(q)
 
-  //row := make(map[string]interface{})
-  //rows,err:= stmt.Queryx(where.Arg)
-  //if err!=nil {
-  //  log.Error(err)
-  //}
-  var result []interface{}
-  item := make(map[string]interface{})
+  rows, err := db.Queryx(q, a...)
 
-  rows, err := stmt.Queryx(where.Arg)
-  for rows.Next() {
-    err := rows.MapScan(item)
-    if err != nil {
-      log.Error(err)
-    }
+  row := make(map[string]interface{})
+  err = rows.MapScan(row)
 
-    for k, encoded := range item {
-      switch encoded.(type) {
-      case []byte:
-        item[k] = string(encoded.([]byte))
-      }
-    }
-    result = append(result, item)
+  if err != nil {
+    log.Fatal(err)
   }
 
-  c.JSON(http.StatusOK, result)
+  sqlBuilder.RowConvert(&row)
+
+  fmt.Println(row)
+
+  c.JSON(http.StatusOK, row)
 }
 
 // @Summary 添加数据库配置
