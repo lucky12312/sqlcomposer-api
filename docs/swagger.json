@@ -161,6 +161,13 @@
                         "name": "content",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "接口路径",
+                        "name": "path",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -222,11 +229,47 @@
                         "name": "content",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "path",
+                        "name": "path",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "201": {
                         "description": "update completed",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "error",
+                        "schema": {
+                            "$ref": "#/definitions/restapi.Error"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "文档"
+                ],
+                "summary": "删除文档",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "uuid",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "delete completed",
                         "schema": {
                             "type": "string"
                         }
@@ -252,6 +295,13 @@
                         "description": "path",
                         "name": "path",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "dbname",
+                        "name": "dbname",
+                        "in": "query",
                         "required": true
                     }
                 ],

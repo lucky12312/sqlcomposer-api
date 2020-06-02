@@ -86,6 +86,11 @@ paths:
         name: path
         required: true
         type: string
+      - description: dbname
+        in: query
+        name: dbname
+        required: true
+        type: string
       responses:
         "200":
           description: json
@@ -194,6 +199,11 @@ paths:
         name: content
         required: true
         type: string
+      - description: 接口路径
+        in: formData
+        name: path
+        required: true
+        type: string
       responses:
         "201":
           description: insert completed
@@ -207,6 +217,25 @@ paths:
       tags:
       - 文档
   /doc/{uuid}:
+    delete:
+      parameters:
+      - description: uuid
+        in: path
+        name: uuid
+        required: true
+        type: string
+      responses:
+        "201":
+          description: delete completed
+          schema:
+            type: string
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/restapi.Error'
+      summary: 删除文档
+      tags:
+      - 文档
     get:
       parameters:
       - description: uuid
@@ -232,6 +261,11 @@ paths:
       - description: content
         in: formData
         name: content
+        required: true
+        type: string
+      - description: path
+        in: formData
+        name: path
         required: true
         type: string
       responses:

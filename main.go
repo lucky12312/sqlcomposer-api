@@ -1,28 +1,28 @@
 package main
 
 import (
-  "github.com/gin-gonic/gin"
-  _ "github.com/go-sql-driver/mysql"
-  "github.com/jmoiron/sqlx"
-  "github.com/kelseyhightower/envconfig"
-  log "github.com/sirupsen/logrus"
-  swaggerFiles "github.com/swaggo/files"
-  ginSwagger "github.com/swaggo/gin-swagger"
-  _ "gitlab.com/beehplus/sql-compose/docs"
-  "gitlab.com/beehplus/sql-compose/restapi"
-  "time"
+	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
+	"github.com/kelseyhightower/envconfig"
+	log "github.com/sirupsen/logrus"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "gitlab.com/beehplus/sql-compose/docs"
+	"gitlab.com/beehplus/sql-compose/restapi"
+	"time"
 )
 
 //env
 type Specification struct {
-  Debug      bool
-  Port       string
-  BasePath   string
-  Dsn        string
-  User       string
-  Rate       float32
-  Timeout    time.Duration
-  ColorCodes map[string]int
+	Debug      bool
+	Port       string
+	BasePath   string
+	Dsn        string
+	User       string
+	Rate       float32
+	Timeout    time.Duration
+	ColorCodes map[string]int
 }
 
 // @title sql-compose-api
@@ -40,45 +40,45 @@ type Specification struct {
 // @host localhost:8080
 // @BasePath /
 func main() {
+	var s Specification
+	if err := envconfig.Process("sqlcompose", &s); err != nil {
+		log.Fatal(err)
+	}
 
-  var s Specification
-  if err := envconfig.Process("sqlcompose", &s); err != nil {
-    log.Fatal(err)
-  }
+	log.Info(s)
 
-  log.Info(s)
+	//init db
+	db, err := sqlx.Connect("mysql", s.Dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
-  //init db
-  db, err := sqlx.Connect("mysql", s.Dsn)
-  if err != nil {
-    log.Fatal(err)
-  }
-  defer db.Close()
+	//b, _ := base64.StdEncoding.DecodeString("MjAyMDA1MjY3OQ==")
+	//fmt.Println(string(b))
 
-  //b, _ := base64.StdEncoding.DecodeString("MjAyMDA1MjY3OQ==")
-  //fmt.Println(string(b))
+	router := gin.Default()
 
-  router := gin.Default()
+	url := ginSwagger.URL("http://localhost" +
+		s.Port + "/swagger/doc.json")
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
 
-  url := ginSwagger.URL("http://localhost" +
-    s.Port + "/swagger/doc.json")
-  router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
+	handler := restapi.NewHandler(db)
 
-  handler := restapi.NewHandler(db)
+	router.GET("/doc", handler.GetDocList)
+	router.POST("/doc/:uuid", handler.UpdateDoc)
+	router.PATCH("/doc", handler.AddDoc)
+	router.GET("/doc/:uuid", handler.GetDocDetailByUuid)
+	router.DELETE("/doc/:uuid", handler.DeleteDoc)
 
-  router.GET("/doc", handler.GetDocList)
-  router.POST("/doc/:uuid", handler.UpdateDoc)
-  router.PATCH("/doc", handler.AddDoc)
-  router.GET("/doc/:uuid", handler.GetDocDetailByUuid)
+	router.GET("/dbconfig", handler.GetDbConfigList)
+	router.DELETE("/dbconfig/:uuid/", handler.DeleteDbConfigByUUID)
+	router.POST("/dbconfig/:uuid", handler.UpdateDbConfigByUUID)
+	router.PATCH("/dbconfig", handler.AddDbConfig)
+	router.POST(s.BasePath+"*path", handler.GetResult)
 
-  router.GET("/dbconfig", handler.GetDbConfigList)
-  router.DELETE("/dbconfig/:uuid/", handler.DeleteDbConfigByUUID)
-  router.POST("/dbconfig/:uuid", handler.UpdateDbConfigByUUID)
-  router.PATCH("/dbconfig", handler.AddDbConfig)
-  router.POST(s.BasePath+"*path", handler.GetResult)
-
-  if err := router.Run(s.Port); err != nil {
-    log.Fatal(err)
-  }
+	if err := router.Run(s.Port); err != nil {
+		log.Fatal(err)
+	}
 
 }
