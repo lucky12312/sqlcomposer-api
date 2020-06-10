@@ -10,6 +10,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	_ "gitlab.com/beehplus/sql-compose/docs"
 	"gitlab.com/beehplus/sql-compose/restapi"
+	"os"
 	"time"
 )
 
@@ -80,5 +81,16 @@ func main() {
 	if err := router.Run(s.Port); err != nil {
 		log.Fatal(err)
 	}
-
 }
+
+func init() {
+	//log format json
+	log.SetFormatter(&log.TextFormatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		//PrettyPrint:     false,
+	})
+	log.SetOutput(os.Stdout)
+	//set to true to show where the log is printed in the code
+	log.SetReportCaller(true)
+}
+

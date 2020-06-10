@@ -81,13 +81,14 @@ func (s *Service) AddDoc(c *gin.Context) {
 		return
 	}
 
+	uuid1:=uuid.NewV4().String()
 	params := map[string]interface{}{
 		"name":       doc.Info.Name,
 		"path":       path,
 		"content":    content,
 		"created_at": time.Now().Unix(),
 		"updated_at": time.Now().Unix(),
-		"uuid":       uuid.NewV4().String(),
+		"uuid":       uuid1,
 	}
 
 	////todo sqlx判断记录为空有更好的方法
@@ -104,7 +105,7 @@ func (s *Service) AddDoc(c *gin.Context) {
 		})
 		return
 	}
-	c.String(http.StatusCreated, "insert completed")
+	c.String(http.StatusCreated, uuid1)
 }
 
 // @Summary 获取文档列表
@@ -115,13 +116,12 @@ func (s *Service) AddDoc(c *gin.Context) {
 // @Router /doc [get]
 func (s *Service) GetDocList(c *gin.Context) {
 	var result DocListResult
-	var data []*entity.Doc
+	result.Data = []*entity.Doc{}
 
-	err := s.Db.Select(&data, "SELECT uuid,name,path,created_at,updated_at from doc ORDER BY updated_at DESC")
+	err := s.Db.Select(&result.Data, "SELECT uuid,name,path,created_at,updated_at from doc ORDER BY updated_at DESC")
 	if err != nil {
 		log.Error(err)
 	}
-	result.Data = data
 
 	err = s.Db.Get(&result, "SELECT COUNT(id) AS total from doc ORDER BY updated_at DESC")
 	if err != nil {
@@ -313,10 +313,8 @@ func (s *Service) GetResult(c *gin.Context) {
 		})
 		return
 	}
-	err = configureSqlCompose(sqlBuilder)
-	if err != nil {
-		log.Fatal(err)
-	}
+	configureSqlCompose(sqlBuilder)
+
 
 	result := struct {
 		Total int64         `json:"total,omitempty"`
@@ -329,21 +327,27 @@ func (s *Service) GetResult(c *gin.Context) {
 		}
 
 		q, a, err := sqlBuilder.Limit((req.PageIndex-1)*req.PageLimit, req.PageLimit).Rebind(key)
-
 		if err != nil {
 			log.Error(err)
+			c.JSON(http.StatusBadRequest, err)
+			return
 		}
+
 		if key == "total" {
 			var total int64
 			err = db.QueryRowx(q, a...).Scan(&total)
 			if err != nil {
 				log.Error(err)
+				c.JSON(http.StatusBadRequest, err)
+				return
 			}
 			result.Total = total
 		} else {
 			rows, err := db.Queryx(q, a...)
 			if err != nil {
 				log.Error(err)
+				c.JSON(http.StatusBadRequest, err)
+				return
 			}
 
 			for rows.Next() {
@@ -460,9 +464,8 @@ func ProductAttrsToSelect(a map[string]string) string {
 	return strings.Join(str, ",")
 }
 
-func configureSqlCompose(sb *sqlcomposer.SqlBuilder) error {
-
-	err := sb.RegisterToken("attrs", func(params []sqlcomposer.TokenParam) sqlcomposer.TokenReplacer {
+func configureSqlCompose(sb *sqlcomposer.SqlBuilder) {
+	sb.RegisterToken("attrs", func(params []sqlcomposer.TokenParam) sqlcomposer.TokenReplacer {
 		attrs := map[string]string{}
 		for _, p := range params {
 			attrs[p.Name] = p.Value
@@ -472,10 +475,8 @@ func configureSqlCompose(sb *sqlcomposer.SqlBuilder) error {
 			DB:    sb.DB,
 		}
 	})
-	if err != nil {
-		return err
-	}
-	err = sb.RegisterToken("attrs_fields", func(params []sqlcomposer.TokenParam) sqlcomposer.TokenReplacer {
+
+	sb.RegisterToken("attrs_fields", func(params []sqlcomposer.TokenParam) sqlcomposer.TokenReplacer {
 		attrs := map[string]string{}
 		for _, p := range params {
 			attrs[p.Name] = p.Value
@@ -484,10 +485,6 @@ func configureSqlCompose(sb *sqlcomposer.SqlBuilder) error {
 			Attrs: attrs,
 		}
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // @Summary 添加数据库配置
@@ -576,6 +573,7 @@ func (s *Service) UpdateDbConfigByUUID(c *gin.Context) {
 // @Router /dbconfig [get]
 func (s *Service) GetDbConfigList(c *gin.Context) {
 	var list DbConfigList
+	list.Data = []*entity.DataBaseConfig{}
 	err := s.Db.Select(&list.Data, "SELECT * FROM database_config ORDER BY updated_at DESC ")
 	if err != nil {
 		log.Error(err)
