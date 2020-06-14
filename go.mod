@@ -15,7 +15,7 @@ require (
 	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14 // indirect
 	github.com/swaggo/gin-swagger v1.2.0 // indirect
 	github.com/swaggo/swag v1.5.1
-	github.com/wangxb07/sqlcomposer v0.0.0-20200602165420-9be174e1c961
+	github.com/wangxb07/sqlcomposer v0.0.0-20200610175207-009cff1635aa
 	golang.org/x/sys v0.0.0-20200523222454-059865788121 // indirect
 	gopkg.in/yaml.v2 v2.3.0
 )

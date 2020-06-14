@@ -314,6 +314,11 @@ func (s *Service) GetResult(c *gin.Context) {
 		return
 	}
 	configureSqlCompose(sqlBuilder)
+	err = sqlBuilder.RegisterPipelineType("fulltext")
+	if err!=nil{
+		log.Error(err)
+		c.JSON(http.StatusBadRequest,err)
+	}
 
 
 	result := struct {

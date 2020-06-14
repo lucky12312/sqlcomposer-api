@@ -108,6 +108,8 @@ github.com/wangxb07/sqlcomposer v0.0.0-20200531093053-2dd61c91b111 h1:Hg7pPlVjEp
 github.com/wangxb07/sqlcomposer v0.0.0-20200531093053-2dd61c91b111/go.mod h1:VlXZ3bPdMhGJ+lcusNpdcWt90M+bi1ElqVJwmqHJXIs=
 github.com/wangxb07/sqlcomposer v0.0.0-20200602165420-9be174e1c961 h1:g5JZ+6AcXfdypAhKOhkiqzEd0+9TTq7GmCPfBSx/sHo=
 github.com/wangxb07/sqlcomposer v0.0.0-20200602165420-9be174e1c961/go.mod h1:VlXZ3bPdMhGJ+lcusNpdcWt90M+bi1ElqVJwmqHJXIs=
+github.com/wangxb07/sqlcomposer v0.0.0-20200610175207-009cff1635aa h1:/0bglJaykT1Lh///hSxFMaNzLeck4ui5TvfZrm2Bylg=
+github.com/wangxb07/sqlcomposer v0.0.0-20200610175207-009cff1635aa/go.mod h1:VlXZ3bPdMhGJ+lcusNpdcWt90M+bi1ElqVJwmqHJXIs=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20190325154230-a5d413f7728c/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20191205180655-e7c4368fe9dd/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
