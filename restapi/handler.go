@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
-	uuid "github.com/satori/go.uuid"
+	"github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/wangxb07/sqlcomposer"
 	"gitlab.com/beehplus/sql-compose/entity"
@@ -81,13 +81,14 @@ func (s *Service) AddDoc(c *gin.Context) {
 		return
 	}
 
+	uuid1 := uuid.NewV4().String()
 	params := map[string]interface{}{
 		"name":       doc.Info.Name,
 		"path":       path,
 		"content":    content,
 		"created_at": time.Now().Unix(),
 		"updated_at": time.Now().Unix(),
-		"uuid":       uuid.NewV4().String(),
+		"uuid":       uuid1,
 	}
 
 	////todo sqlx判断记录为空有更好的方法
@@ -104,7 +105,50 @@ func (s *Service) AddDoc(c *gin.Context) {
 		})
 		return
 	}
-	c.String(http.StatusCreated, "insert completed")
+	c.String(http.StatusCreated, uuid1)
+}
+
+// @Summary 添加新的文档基本信息，不包含文档内容
+// @Tags 文档
+// @version 1.0
+// @Param name formData string true "文档名称"
+// @Param path formData string true "接口路径"
+// @Param description formData string true "文档描述"
+// @Param db_name formData string true "数据库名称"
+// @Success 201 {string} string	""insert completed""
+// @Failure 400 {object} Error "deserialize yaml failed"
+// @Router /doc [post]
+func (s *Service) PostDoc(c *gin.Context) {
+	name := c.PostForm("name")
+	path := c.PostForm("path")
+	desc := c.PostForm("description")
+	database := c.PostForm("db_name")
+
+	id := uuid.NewV4().String()
+	params := map[string]interface{}{
+		"name":        name,
+		"path":        path,
+		"description": desc,
+		"db_name":     database,
+		"created_at":  time.Now().Unix(),
+		"updated_at":  time.Now().Unix(),
+		"uuid":        id,
+	}
+
+	_, err := s.Db.NamedExec(`INSERT into doc (name, path, description, db_name, created_at, updated_at, uuid) VALUES (:name,:path,:description,:db_name,:created_at,:updated_at,:uuid)`,
+		params,
+	)
+
+	if err != nil {
+		log.Warn(err)
+		c.JSON(http.StatusBadRequest, Error{
+			Code:    40001,
+			Message: "insert failed,maybe the name is duplicated",
+		})
+		return
+	}
+
+	c.String(http.StatusCreated, id)
 }
 
 // @Summary 获取文档列表
@@ -115,13 +159,12 @@ func (s *Service) AddDoc(c *gin.Context) {
 // @Router /doc [get]
 func (s *Service) GetDocList(c *gin.Context) {
 	var result DocListResult
-	var data []*entity.Doc
+	result.Data = []*entity.Doc{}
 
-	err := s.Db.Select(&data, "SELECT uuid,name,path,created_at,updated_at from doc ORDER BY updated_at DESC")
+	err := s.Db.Select(&result.Data, "SELECT uuid,name,path,created_at,updated_at from doc ORDER BY updated_at DESC")
 	if err != nil {
 		log.Error(err)
 	}
-	result.Data = data
 
 	err = s.Db.Get(&result, "SELECT COUNT(id) AS total from doc ORDER BY updated_at DESC")
 	if err != nil {
@@ -155,6 +198,8 @@ func (s *Service) GetDocDetailByUuid(c *gin.Context) {
 // @version 1.0
 // @Param uuid path string true "uuid"
 // @Param content formData string true "content"
+// @Param description formData string true "description"
+// @Param db_name formData string true "db_name"
 // @Param path formData string true "path"
 // @Success 201 {string} string	"update completed"
 // @Failure 400 {object} Error "error"
@@ -163,7 +208,10 @@ func (s *Service) UpdateDoc(c *gin.Context) {
 	var docEntity entity.Doc
 
 	content := c.PostForm("content")
+	name := c.PostForm("name")
 	path := c.PostForm("path")
+	description := c.PostForm("description")
+	dbName := c.PostForm("db_name")
 
 	var doc sqlcomposer.SqlApiDoc
 
@@ -179,12 +227,13 @@ func (s *Service) UpdateDoc(c *gin.Context) {
 	}
 
 	params := map[string]interface{}{
-		"name":       doc.Info.Name,
-		"path":       path,
-		"content":    content,
-		"created_at": time.Now().Unix(),
-		"updated_at": time.Now().Unix(),
-		"uuid":       c.Param("uuid"),
+		"uuid":        c.Param("uuid"),
+		"name":        name,
+		"path":        path,
+		"content":     content,
+		"description": description,
+		"db_name":     dbName,
+		"updated_at":  time.Now().Unix(),
 	}
 
 	tx := s.Db.MustBegin()
@@ -198,7 +247,7 @@ func (s *Service) UpdateDoc(c *gin.Context) {
 		return
 	}
 
-	_, err = tx.NamedExec(`UPDATE doc SET name=:name,path=:path,content=:content,created_at=:created_at,updated_at=:updated_at WHERE uuid=:uuid`,
+	_, err = tx.NamedExec(`UPDATE doc SET name=:name,path=:path,content=:content,description=:description,db_name=:db_name,updated_at=:updated_at WHERE uuid=:uuid`,
 		params, )
 
 	if err != nil {
@@ -219,7 +268,7 @@ func (s *Service) UpdateDoc(c *gin.Context) {
 // @Tags 接口
 // @version 1.0
 // @Param path path string true "path"
-// @Param dbname query string true "dbname"
+// @Param debug query string true "debug"
 // @Success 200 {string} string	"json"
 // @Failure 400 {object} Error "error"
 // @Failure 404 {object} Error "not found"
@@ -227,6 +276,7 @@ func (s *Service) UpdateDoc(c *gin.Context) {
 func (s *Service) GetResult(c *gin.Context) {
 	//get yml by path from db
 	path := c.Param("path")
+	debug := c.Query("debug")
 
 	var docEntity entity.Doc
 	if err := s.Db.Get(&docEntity, "select * from doc WHERE path=?", path); err != nil {
@@ -249,8 +299,6 @@ func (s *Service) GetResult(c *gin.Context) {
 		return
 	}
 
-	fmt.Println(req)
-
 	var custFilters []sqlcomposer.Filter
 	for _, filter := range req.Filters {
 		custFilter := sqlcomposer.Filter{
@@ -265,7 +313,7 @@ func (s *Service) GetResult(c *gin.Context) {
 	//get dsn by dbname
 	var doc sqlcomposer.SqlApiDoc
 
-	buffer := []byte(docEntity.Content)
+	buffer := []byte(*docEntity.Content)
 	err := yaml.Unmarshal(buffer, &doc)
 	if err != nil {
 		log.Warn(err)
@@ -275,13 +323,8 @@ func (s *Service) GetResult(c *gin.Context) {
 		})
 	}
 
-	dbName := c.Query("dbname")
-	log.WithFields(log.Fields{
-		"dbname": dbName,
-	}).Info("dbname")
-
 	var dbConfig entity.DataBaseConfig
-	err = s.Db.Get(&dbConfig, "SELECT * FROM database_config WHERE name=?", dbName)
+	err = s.Db.Get(&dbConfig, "SELECT * FROM database_config WHERE name=?", docEntity.DB)
 	if err != nil {
 		log.Error(err)
 		c.JSON(http.StatusBadRequest, Error{
@@ -304,7 +347,7 @@ func (s *Service) GetResult(c *gin.Context) {
 	}
 	defer db.Close()
 
-	sqlBuilder, err := sqlcomposer.NewSqlBuilder(db, []byte(docEntity.Content))
+	sqlBuilder, err := sqlcomposer.NewSqlBuilder(db, []byte(*docEntity.Content))
 	if err != nil {
 		log.Error(err)
 		c.JSON(http.StatusBadRequest, Error{
@@ -313,15 +356,15 @@ func (s *Service) GetResult(c *gin.Context) {
 		})
 		return
 	}
-	err = configureSqlCompose(sqlBuilder)
-	if err != nil {
-		log.Fatal(err)
-	}
+	configureSqlCompose(sqlBuilder)
 
 	result := struct {
-		Total int64         `json:"total,omitempty"`
-		Data  []interface{} `json:"data,omitempty"`
+		Total int64             `json:"total,omitempty"`
+		Data  []interface{}     `json:"data,omitempty"`
+		SQL   map[string]string `json:"sql"`
 	}{}
+
+	result.SQL = make(map[string]string)
 	for key := range doc.Composition.Subject {
 		err = sqlBuilder.AddFilters(custFilters, sqlcomposer.AND)
 		if err != nil {
@@ -330,20 +373,32 @@ func (s *Service) GetResult(c *gin.Context) {
 
 		q, a, err := sqlBuilder.Limit((req.PageIndex-1)*req.PageLimit, req.PageLimit).Rebind(key)
 
+		if debug == "1" {
+			result.SQL[key] = q
+		}
+
 		if err != nil {
 			log.Error(err)
+			c.JSON(http.StatusBadRequest, err)
+			return
 		}
+
 		if key == "total" {
 			var total int64
 			err = db.QueryRowx(q, a...).Scan(&total)
 			if err != nil {
 				log.Error(err)
+				c.JSON(http.StatusBadRequest, err)
+				return
 			}
 			result.Total = total
 		} else {
 			rows, err := db.Queryx(q, a...)
+
 			if err != nil {
 				log.Error(err)
+				c.JSON(http.StatusBadRequest, err)
+				return
 			}
 
 			for rows.Next() {
@@ -460,9 +515,8 @@ func ProductAttrsToSelect(a map[string]string) string {
 	return strings.Join(str, ",")
 }
 
-func configureSqlCompose(sb *sqlcomposer.SqlBuilder) error {
-
-	err := sb.RegisterToken("attrs", func(params []sqlcomposer.TokenParam) sqlcomposer.TokenReplacer {
+func configureSqlCompose(sb *sqlcomposer.SqlBuilder) {
+	sb.RegisterToken("attrs", func(params []sqlcomposer.TokenParam) sqlcomposer.TokenReplacer {
 		attrs := map[string]string{}
 		for _, p := range params {
 			attrs[p.Name] = p.Value
@@ -472,10 +526,8 @@ func configureSqlCompose(sb *sqlcomposer.SqlBuilder) error {
 			DB:    sb.DB,
 		}
 	})
-	if err != nil {
-		return err
-	}
-	err = sb.RegisterToken("attrs_fields", func(params []sqlcomposer.TokenParam) sqlcomposer.TokenReplacer {
+
+	sb.RegisterToken("attrs_fields", func(params []sqlcomposer.TokenParam) sqlcomposer.TokenReplacer {
 		attrs := map[string]string{}
 		for _, p := range params {
 			attrs[p.Name] = p.Value
@@ -484,29 +536,27 @@ func configureSqlCompose(sb *sqlcomposer.SqlBuilder) error {
 			Attrs: attrs,
 		}
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // @Summary 添加数据库配置
 // @Tags 数据库配置
 // @version 1.0
-// @Param params body AddDbConfigRequest true "DbConfig"
+// @Param name formData string true "name"
+// @Param dns formData string true "dns"
 // @Success 201 {string} string	"json"
 // @Failure 400 {object} Error "error"
 // @Router /dbconfig [patch]
 func (s *Service) AddDbConfig(c *gin.Context) {
-	var req AddDbConfigRequest
-	c.Bind(&req)
+	name := c.PostForm("name")
+	dns := c.PostForm("dns")
+
 	tx := s.Db.MustBegin()
 
 	_, err := tx.NamedExec("INSERT INTO database_config (uuid,name,dsn,created_at,updated_at) VALUES (:uuid,:name,:dsn,:created_at,:updated_at)",
 		map[string]interface{}{
 			"uuid":       uuid.NewV4().String(),
-			"name":       req.Name,
-			"dsn":        req.Dsn,
+			"name":       name,
+			"dsn":        dns,
 			"created_at": time.Now().Unix(),
 			"updated_at": time.Now().Unix(),
 		})
@@ -576,6 +626,7 @@ func (s *Service) UpdateDbConfigByUUID(c *gin.Context) {
 // @Router /dbconfig [get]
 func (s *Service) GetDbConfigList(c *gin.Context) {
 	var list DbConfigList
+	list.Data = []*entity.DataBaseConfig{}
 	err := s.Db.Select(&list.Data, "SELECT * FROM database_config ORDER BY updated_at DESC ")
 	if err != nil {
 		log.Error(err)

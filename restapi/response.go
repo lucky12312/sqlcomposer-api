@@ -9,7 +9,7 @@ type DocListResult struct {
 
 type DbConfigList struct {
   Data  []*entity.DataBaseConfig `json:"data"`
-  Total int                      `json:"total"`
+  Total int64                      `json:"total"`
 }
 
 type Created struct {

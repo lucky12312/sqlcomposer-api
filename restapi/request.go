@@ -21,5 +21,5 @@ type GetResultRequest struct {
 type GetResultFilterItem struct {
 	Attr string               `json:"attr"`
 	Op   sqlcomposer.Operator `json:"op"`
-	Val  string               `json:"val"`
+	Val  interface{}       `json:"val"`
 }

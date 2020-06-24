@@ -10,6 +10,8 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	_ "gitlab.com/beehplus/sql-compose/docs"
 	"gitlab.com/beehplus/sql-compose/restapi"
+	"github.com/gin-contrib/cors"
+	"os"
 	"time"
 )
 
@@ -46,6 +48,7 @@ func main() {
 	}
 
 	log.Info(s)
+	log.SetLevel(log.DebugLevel)
 
 	//init db
 	db, err := sqlx.Connect("mysql", s.Dsn)
@@ -65,20 +68,43 @@ func main() {
 
 	handler := restapi.NewHandler(db)
 
+	// 跨域
+	router.Use(cors.New(cors.Config{
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "X-Requested-With", "X-CSRF-TOKEN"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		AllowAllOrigins:  true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	router.GET("/doc", handler.GetDocList)
 	router.POST("/doc/:uuid", handler.UpdateDoc)
 	router.PATCH("/doc", handler.AddDoc)
+	router.POST("/doc", handler.PostDoc)
 	router.GET("/doc/:uuid", handler.GetDocDetailByUuid)
 	router.DELETE("/doc/:uuid", handler.DeleteDoc)
 
-	router.GET("/dbconfig", handler.GetDbConfigList)
-	router.DELETE("/dbconfig/:uuid/", handler.DeleteDbConfigByUUID)
-	router.POST("/dbconfig/:uuid", handler.UpdateDbConfigByUUID)
-	router.PATCH("/dbconfig", handler.AddDbConfig)
+	router.GET("/dns", handler.GetDbConfigList)
+	router.DELETE("/dns/:uuid", handler.DeleteDbConfigByUUID)
+	router.POST("/dns/:uuid", handler.UpdateDbConfigByUUID)
+	router.POST("/dns", handler.AddDbConfig)
+
 	router.POST(s.BasePath+"*path", handler.GetResult)
 
 	if err := router.Run(s.Port); err != nil {
 		log.Fatal(err)
 	}
-
 }
+
+func init() {
+	//log format json
+	log.SetFormatter(&log.TextFormatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		//PrettyPrint:     false,
+	})
+	log.SetOutput(os.Stdout)
+	//set to true to show where the log is printed in the code
+	log.SetReportCaller(true)
+}
+
